@@ -1,80 +1,74 @@
-// backend/controllers/items.controller.js
-// This layer handles request/response formatting and calls the service layer.
-const itemService = require('../services/items.service');
+const itemsService = require('../services/items.service');
 
-// GET /api/items - Fetch all items
-exports.listItems = async (req, res, next) => {
+// Handles POST /api/items
+exports.createItem = async (req, res, next) => {
+    // Note: Authentication middleware has already populated req.user
+    const { name, description, price } = req.body;
+    const artistId = req.user.id; // Get artistId from authenticated token
+
+    if (!name || !description || !price) {
+        return res.status(400).json({ message: 'All fields (name, description, price) are required.' });
+    }
+
     try {
-        const items = await itemService.getAllItems();
+        const newItem = await itemsService.createItem({ name, description, price, artistId });
+        res.status(201).json({ 
+            message: 'Item created successfully.',
+            item: { id: newItem.id, name: newItem.name, artist_id: newItem.artist_id }
+        });
+    } catch (error) {
+        next(error); // Pass error to global error handler
+    }
+};
+
+// Handles GET /api/items
+exports.getAllItems = async (req, res, next) => {
+    try {
+        const items = await itemsService.getAllItems();
         res.status(200).json(items);
     } catch (error) {
         next(error);
     }
 };
 
-// POST /api/items - Create a new item (Protected by auth middleware)
-exports.createItem = async (req, res, next) => {
-    try {
-        const { name, description, price } = req.body;
-        
-        // Validation: All fields are required
-        if (!name || !description || price === undefined) {
-            return res.status(400).send({ message: "Name, description, and price are required." });
-        }
-
-        // Get artist ID from the token attached by verifyToken middleware
-        const artist_id = req.user.id; 
-
-        const newItem = await itemService.createItem({ name, description, price, artist_id });
-        
-        res.status(201).json({ message: "Item created successfully.", item: newItem });
-    } catch (error) {
-        next(error);
-    }
-};
-
-// PUT /api/items/:id - Update an item (Protected)
+// Handles PUT /api/items/:id
 exports.updateItem = async (req, res, next) => {
-    try {
-        const itemId = parseInt(req.params.id);
-        const { name, description, price } = req.body;
-        
-        // Simple validation
-        if (!name && !description && price === undefined) {
-             return res.status(400).send({ message: "At least one field (name, description, or price) must be provided for update." });
-        }
-        
-        // Get artist ID from token attached by verifyToken middleware
-        const artistId = req.user.id;
+    const { id } = req.params;
+    const updates = req.body;
+    const userId = req.user.id;
 
-        const updatedItem = await itemService.updateItem(itemId, { name, description, price }, artistId);
-        
-        res.status(200).json({ message: "Item updated successfully.", item: updatedItem });
-    } catch (error) {
-        if (error.message.includes('not found')) {
-            return res.status(404).send({ message: error.message });
-        } else if (error.message.includes('unauthorized')) {
-             return res.status(403).send({ message: error.message });
+    if (updates.price) {
+        updates.price = parseFloat(updates.price);
+    }
+    
+    try {
+        // Service handles authorization (checking if the user owns the item)
+        const updatedItem = await itemsService.updateItem(id, updates, userId);
+        if (!updatedItem) {
+            return res.status(404).json({ message: 'Item not found or unauthorized to update.' });
         }
+        res.status(200).json({ 
+            message: 'Item updated successfully.',
+            item: updatedItem 
+        });
+    } catch (error) {
         next(error);
     }
 };
 
-// DELETE /api/items/:id - Delete an item (Protected)
+// Handles DELETE /api/items/:id
 exports.deleteItem = async (req, res, next) => {
+    const { id } = req.params;
+    const userId = req.user.id;
+
     try {
-        const itemId = parseInt(req.params.id);
-        const artistId = req.user.id; // Get artist ID from token
-        
-        await itemService.deleteItem(itemId, artistId);
-        
-        res.status(204).send(); // 204 No Content is standard for successful deletion
-    } catch (error) {
-        if (error.message.includes('not found')) {
-            return res.status(404).send({ message: error.message });
-        } else if (error.message.includes('unauthorized')) {
-             return res.status(403).send({ message: error.message });
+        // Service handles authorization
+        const deleted = await itemsService.deleteItem(id, userId);
+        if (!deleted) {
+            return res.status(404).json({ message: 'Item not found or unauthorized to delete.' });
         }
+        res.status(204).send();
+    } catch (error) {
         next(error);
     }
 };
