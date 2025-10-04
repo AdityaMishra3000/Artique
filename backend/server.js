@@ -1,37 +1,40 @@
-// 1. First, we bring in the Express library.
+// CORE DEPENDENCIES
 const express = require("express");
-
-// 2. Then, we bring in our new router file.
-const itemsRouter = require("./routes/items");
-
-// Import the 'cors' middleware
 const cors = require("cors");
+const itemsRouter = require("./routes/items.routes"); // Marketplace items route
+const authRouter = require("./routes/auth.routes"); // Authentication routes
 
-// 3. We create an instance of the Express application.
 const app = express();
-
-// 4. We define a 'port' for our server to listen on.
 const port = 3000;
 
-// 5. This is a crucial middleware. It tells Express to parse
-// the JSON data sent in a request body (e.g., from POST or PUT requests)
-// and make it available on the `req.body` property.
-app.use(express.json());
-
-// THIS IS THE LINE THAT WAS MISSING IN THE LOGIC.
-// It tells Express to enable CORS for all requests.
+// MIDDLEWARE SETUP
+// 1. CORS: Allow frontend to communicate with backend
 app.use(cors());
 
+// 2. JSON Parser: Parse incoming JSON request bodies (for POST/PUT requests)
+app.use(express.json());
 
-// 6. Our first route, which remains in the main file.
+// ROUTE HANDLERS
+// NEW: Authentication routes for registration and login
+app.use("/api/auth", authRouter);
+
+// Existing: Marketplace item routes
+app.use("/api/items", itemsRouter); 
+
+// Core Route (Status Check)
 app.get("/", (req, res) => {
-  res.send("Welcome to the Artique Backend API!");
+  res.send("Artique Backend API is scalable and operational!");
 });
 
-// 7. We use app.use() to tell our server to use the itemsRouter we imported.
-app.use("/api/items", itemsRouter);
+// GLOBAL ERROR HANDLER 
+app.use((err, req, res, next) => {
+    console.error(err.stack); // Log the full error stack for debugging
+    res.status(500).send({
+        message: 'A critical server error occurred.',
+        error: err.message
+    });
+});
 
-// 8. This is the core command to start the server.
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
 });
