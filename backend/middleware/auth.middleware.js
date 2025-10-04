@@ -1,45 +1,44 @@
-// backend/middleware/auth.middleware.js
 const jwt = require('jsonwebtoken');
 
-// Use same secret key as defined in auth.service.js
-const JWT_SECRET = 'your_super_secret_key_for_artique_dev'; 
+// Security configuration (In a real app, use environment variables)
+const JWT_SECRET = 'your_super_secret_jwt_key'; // CHANGE THIS IN PRODUCTION
+// NOTE: Make sure this SECRET matches the one in auth.service.js
 
-/**
- * Middleware function to verify JWT and attach user data (id, role) to the request.
- * Protects routes requiring authentication.
- */
-exports.verifyToken = (req, res, next) => {
-    // 1. Get the token from the header (Bearer Token format)
-    const authHeader = req.headers.authorization;
-    if (!authHeader) {
-        return res.status(401).send({ message: "Authentication token missing." });
+// Middleware to verify JWT token
+exports.authenticateToken = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    // Format: "Bearer TOKEN"
+    const token = authHeader && authHeader.split(' ')[1]; 
+
+    if (token == null) {
+        // 401 Unauthorized: Token missing
+        return res.status(401).json({ message: 'Authentication token required.' });
     }
 
-    const token = authHeader.split(' ')[1];
-    if (!token) {
-        return res.status(401).send({ message: "Token format is invalid." });
-    }
-
-    try {
-        // 2. Verify and decode the token
-        const decoded = jwt.verify(token, JWT_SECRET);
-        
-        // 3. Attach user info (id, role) to the request object
-        req.user = decoded; 
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+        if (err) {
+            // 403 Forbidden: Token invalid or expired
+            return res.status(403).json({ message: 'Invalid or expired token.' });
+        }
+        // Token is valid, attach user payload (id, role) to the request
+        req.user = user;
         next();
-    } catch (err) {
-        return res.status(403).send({ message: "Invalid or expired token." });
-    }
+    });
 };
 
-/**
- * Middleware function to restrict access to 'artist' role only.
- */
-exports.isArtist = (req, res, next) => {
-    // Check if user object was attached by verifyToken middleware and if role is 'artist'
-    if (req.user && req.user.role === 'artist') {
+// Middleware Factory to check if the user has the required role
+// This function returns a middleware function (closure)
+exports.checkRole = (requiredRole) => {
+    return (req, res, next) => {
+        // The previous authenticateToken middleware must have run first
+        if (!req.user || req.user.role !== requiredRole) {
+            // 403 Forbidden: User does not have permission
+            return res.status(403).json({ 
+                message: `Access denied. Requires '${requiredRole}' role.`,
+                // Optionally log what role they had for debugging
+                your_role: req.user ? req.user.role : 'none' 
+            });
+        }
         next();
-    } else {
-        return res.status(403).send({ message: "Access denied. Artist role required." });
-    }
+    };
 };

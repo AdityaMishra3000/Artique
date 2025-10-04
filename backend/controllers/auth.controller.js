@@ -1,7 +1,7 @@
 const authService = require('../services/auth.service');
 
 // Handles POST /api/auth/register
-exports.register = async (req, res, next) => {
+exports.registerUser = async (req, res, next) => {
     const { username, email, password, role } = req.body;
 
     if (!username || !email || !password || !role) {
@@ -21,7 +21,7 @@ exports.register = async (req, res, next) => {
 };
 
 // Handles POST /api/auth/login
-exports.login = async (req, res, next) => {
+exports.loginUser = async (req, res, next) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
